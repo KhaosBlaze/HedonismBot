@@ -1,17 +1,8 @@
-'''
-Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
-
-    http://aws.amazon.com/apache2.0/
-
-or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-'''
-
 import sys
 import irc.bot
 import requests
 import re
+
 
 class TwitchBot(irc.bot.SingleServerIRCBot):
     def __init__(self, username, client_id, token, channel):
@@ -40,10 +31,13 @@ class TwitchBot(irc.bot.SingleServerIRCBot):
         c.cap('REQ', ':twitch.tv/membership')
         c.cap('REQ', ':twitch.tv/tags')
         c.cap('REQ', ':twitch.tv/commands')
+	#c.send('CAP REQ :twitch.tv/membership twitch.tv/tags twitch.tv/commands\r\n'.encode('utf-8'))
         c.join(self.channel)
+	
+	c.privmsg(self.channel, '.w KhaosBlaze Test')	
 
     def on_pubmsg(self, c, e):
-	msg = str(e.arguments[0])
+	msg = e.arguments[0].encode('utf-8')
         # If a chat message starts with an exclamation point, try to run it as a command
         if 'cheer' in msg and 'assassinate' in msg:
 	    self.assassinate(e)
@@ -52,11 +46,12 @@ class TwitchBot(irc.bot.SingleServerIRCBot):
             print 'Received command: ' + cmd
             self.do_command(e, cmd)
 	else:
-	    print 'What is' + e.arguments[0]
+	    print e.tags[3]['value'] + ': ' + e.arguments[0]
         return
 
     def do_command(self, e, cmd):
         c = self.connection
+	sender = e.tags[3]['value']
 
         # Poll the API to get current game.
         if cmd == "e":
@@ -73,20 +68,21 @@ class TwitchBot(irc.bot.SingleServerIRCBot):
             c.privmsg(self.channel, r['display_name'] + ' channel title is currently ' + r['status'])
 
         # Provide basic information to viewers for specific commands
-        elif cmd == "r":
-            message = "This is an example bot, replace this text with your raffle text."
-            c.privmsg(self.channel, message)
-        elif cmd == "schedule":
-            message = "This is an example bot, replace this text with your schedule text."            
-            c.privmsg(self.channel, message)
+
+	elif cmd == "senate":
+	    message = "/w " + sender +" Currently this bot only does assasinations. You can do this by ensuring your targets name is first word in the message as well as adding your cheer amount and the world 'assassinate'. Do note that the timeout exchange is 1 second per 10 bits "
+	    print message
+	    c.privmsg(self.channel, message)
+
+	else:
+	    pass
 
 	# The command was not recognized
-        else:
-            c.privmsg(self.channel, "Did not understand command: " + cmd)
 
     def assassinate(self, e):
 	c = self.connection
 	array = e.arguments[0].split(' ')
+	sender = e.tags[3]['value']
 	bits = 0
 	print 'Get this bread'
 
@@ -102,37 +98,16 @@ class TwitchBot(irc.bot.SingleServerIRCBot):
 	message = ''
 	target = array[0]
 	array.pop(0)
-	message= ' '.join(array)
+	message= ' '.join(array).encode('utf-8').strip()
 	time = str(bits/10)
-
+	
 	if int(time) > 0:
-		popoff = e.tags[3]['value'] + ' is gonna end ' + target + ' man for ' + time + ' ' + message
+		popoff = 'The death of ' + target + ' has been contracted. A new clone will be ready in  ' + time + ' seconds.'
 		c.privmsg(self.channel, popoff)
+		#timeout = '/timeout ' + target + ' ' + time
 		timeout = '/timeout ' + target + ' ' + time
 		print(timeout)
+		print(sender)
 		c.privmsg(self.channel, timeout)
-	else:
-		c.privmsg(self.channel, "you didn't do it right")
-
-class Proposal():
-	def __init__ (self, proposal, owner):
-	    self.legislation = proposal
-	    self.owner = owner
-	    #self.name = 
-
-
-def main():
-    if len(sys.argv) != 5:
-        print("Usage: twitchbot <username> <client id> <token> <channel>")
-        sys.exit(1)
-
-    username  = sys.argv[1]
-    client_id = sys.argv[2]
-    token     = sys.argv[3]
-    channel   = sys.argv[4]
-
-    bot = TwitchBot(username, client_id, token, channel)
-    bot.start()
-
-if __name__ == "__main__":
-    main()
+	elif bits < 10:
+		c.privmsg(self.channel, "You need to donate more than 10 bits")
